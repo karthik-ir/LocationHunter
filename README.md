@@ -1,6 +1,7 @@
 ### Location Tracker
 
 Run the project using  `go install ./main/`
+
 Run the test coverage with `go test -coverprofile=main`
 
 ##### Project walk through 
@@ -28,22 +29,30 @@ Two of sample implementations are as below :
 2. File properties
     
     a. `file` - Absolute path of the file
+    
     b. `separator` - The csv seprator. By default `,`
+    
     c. `strict` - `true` or `false` if false, bad lines in the file in between are ignored and processed further.
 
 3. DB Properties
 
     a. `dbconnectionstring` - Defaults to `localhost:3306` used to connect to the database.
+    
     b. `user` - username of the database
+    
     c. `password` - password to connect to the datasource
+    
     d. `database` - actual database name. 
+    
     e. `table` - Table name defaulting to `geoData`
     
 4. Common properties
 
-    a. `lat` - Home latitude location to be searched with
-    b. `lng` - Home Longitude location
-    c. `top` - Search top `n` nearest location
+    a. `lat` - Home latitude location to be searched with. Defaulting to `51.925146`
+    
+    b. `lng` - Home Longitude location. Defaulting to `4.478617`
+    
+    c. `top` - Search top `n` nearest location. Defaulting to `5`
 
 ### Other notes:
 
@@ -51,7 +60,7 @@ The project uses `n` sized heaps in order to be able to calculate large data set
 
 The top `n` nearest locations are displayed in the console at the end of the program. 
 
-sample output 
+#sample output#
 
 ```$xslt
 Number: 1 Distance 0.33 Data: {51.9271671 4.4822171 442406} 
