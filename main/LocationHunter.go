@@ -11,8 +11,8 @@ import (
 	"flag"
 	"container/heap"
 	"math"
-	_ "database/sql"
-	_ "github.com/ziutek/mymysql/mysql"
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 const earthRadius = float64(6371)
@@ -28,86 +28,55 @@ type Data struct {
 	id  int64
 }
 
-type Item struct {
+type Node struct {
 	value    Data
 	distance float64
 }
 
-type maxHeap []*Item
-
-type dataSource interface {
-	readLine()
-	parseLine(record []string) (recordData Data, err error)
-}
+type maxHeap []*Node
 
 const (
 	FILE = "file"
 	DB   = "db"
 )
 
-func main() {
-	var dataSourceType string
+type File struct {
+	filePath  string
+	delimiter string
 
-	var filePtr, dbptr, dbuser, dbpass, dbname string
-	var homeLat, homeLng float64
-
-	flag.Float64Var(&homeLat, "lat", 51.925146, "Latitude of the Home location")
-	flag.Float64Var(&homeLng, "lng", 4.478617, "Longitude of the Home location")
-	flag.StringVar(&dataSourceType, "datasource", "file", "Either it is of type file or db")
-
-	flag.StringVar(&filePtr, "file", "", "File absolute path")
-
-	flag.StringVar(&dbptr, "dbconnectionstring", "127.0.0.1:3306", "DB connection string eg: localhost:3306")
-	flag.StringVar(&dbuser, "user", "root", "user for db")
-	flag.StringVar(&dbpass, "password", "", "password for the user")
-	flag.StringVar(&dbname, "database", "", "Name of the database")
-
-	flag.Parse()
-	var pq maxHeap
-
-	switch dataSourceType {
-	case FILE:
-		pq = readFileAndCalculateShortestLocation(filePtr, Point{homeLat, homeLng});
-	case DB:
-
-	default:
-
-	}
-
-	minHeap := reverseHeap(pq)
-	for i := 0; i < len(minHeap); i++ {
-		log.Printf("%.2f:%v \n\n", minHeap[i].distance, minHeap[i].value)
-	}
+	common Common
 }
 
-func reverseHeap(pq maxHeap) []*Item {
-	//Reverse the list
-	r := make([]*Item, pq.Len())
-	for i := len(r) - 1; i >= 0; i-- {
-		r[i] = heap.Pop(&pq).(*Item)
-	}
-	return r
+type Database struct {
+	connectionString string
+	username         string
+	password         string
+	database         string
+
+	common Common
 }
 
-func readFileAndCalculateShortestLocation(fileName string, homeLocation Point) (maxHeap) {
+type Common struct {
+	homeLat                 float64
+	homeLng                 float64
+	numberOfNearestElements int
+}
 
-	// Open CSV file
-	file, err := os.Open(fileName)
+type DataSource interface {
+	beginProcessing(queue *maxHeap)
+}
+
+func (file File) beginProcessing(queue *maxHeap) {
+	f, err := os.Open(file.filePath)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Error opening the file of Path %v", fileName), err)
+		log.Fatal(fmt.Sprintf("Error opening the file of Path %v", file.filePath), err)
 	}
-	defer file.Close()
+	defer f.Close()
 
-	reader := csv.NewReader(file)
-	queue := readAndProcessEachLine(reader, homeLocation)
+	reader := csv.NewReader(f)
 
-	return queue;
-}
-
-func readAndProcessEachLine(reader *csv.Reader, homeLocation Point) maxHeap {
 	var lineReadCount int = 1
-	queue := make(maxHeap, 0, 6)
-	heap.Init(&queue)
+
 	for {
 		record, err := reader.Read()
 		// Stop at EOF.
@@ -119,8 +88,8 @@ func readAndProcessEachLine(reader *csv.Reader, homeLocation Point) maxHeap {
 			log.Fatal("Error Reading the line number : %v %v", lineReadCount, err)
 		}
 
-		if skipLine(lineReadCount) {
-			lineReadCount = incrementLine(lineReadCount)
+		if file.skipLine(lineReadCount) {
+			lineReadCount = lineReadCount + 1
 			continue
 		}
 
@@ -130,18 +99,14 @@ func readAndProcessEachLine(reader *csv.Reader, homeLocation Point) maxHeap {
 			//TODO: May be ignore this line and process later. Clarification required
 			log.Fatal("Invalid text in the file and the processing is stopped.")
 		}
-		calculatedDistance := calculateDistanceInKiloMeters(Point{recordData.lat, recordData.lng}, homeLocation)
-		heap.Push(&queue, &Item{recordData, calculatedDistance})
-		if queue.Len() > 5 {
-			heap.Pop(&queue)
-		}
-		incrementLine(lineReadCount)
+
+		calculateDistanceAndEnqueue(recordData, Point{file.common.homeLat, file.common.homeLng}, queue)
+		lineReadCount = lineReadCount + 1
 	}
-	return queue
 }
 
 //List of lines to be skipped for this file
-func skipLine(lineNumber int) bool {
+func (file File) skipLine(lineNumber int) bool {
 	if lineNumber == 1 {
 		log.Println("Skipping the first line")
 		return true;
@@ -149,8 +114,113 @@ func skipLine(lineNumber int) bool {
 	return false
 }
 
-func incrementLine(lineReadCount int) int {
-	return lineReadCount + 1
+func (db Database) beginProcessing(queue *maxHeap) {
+
+	connection, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", db.username, db.password, db.connectionString, db.database))
+
+	if err != nil {
+		panic(err.Error())
+	}
+	defer connection.Close()
+
+	if err := connection.Ping(); err != nil {
+		log.Fatal(err)
+
+		rows, err := connection.Query("SELECT id,lat,lng FROM locations")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for rows.Next() {
+			var id int64
+			var lat, lng float64
+
+			if err := rows.Scan(&id); err != nil {
+				log.Fatal(err)
+			}
+			if err := rows.Scan(&lat); err != nil {
+				log.Fatal(err)
+			}
+			if err := rows.Scan(&lng); err != nil {
+				log.Fatal(err)
+			}
+			calculateDistanceAndEnqueue(Data{id: id, lng: lng, lat: lat}, Point{db.common.homeLat, db.common.homeLng}, queue)
+		}
+		if err := rows.Err(); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func main() {
+
+	dataSourceType, commonProperties, fileProperties, databaseProperties := extractCommandLineFlags()
+	queue := make(maxHeap, 0, commonProperties.numberOfNearestElements+1)
+	heap.Init(&queue)
+
+	var dataSource DataSource
+
+	switch dataSourceType {
+	case FILE:
+		dataSource = fileProperties
+	case DB:
+		dataSource = databaseProperties
+	default:
+		log.Fatal("Invalid data source type.")
+	}
+
+	dataSource.beginProcessing(&queue)
+
+	//Convert max to min heap
+	minHeap := reverseHeap(queue)
+	for i := 0; i < len(minHeap); i++ {
+		log.Printf("%.2f:%v \n\n", minHeap[i].distance, minHeap[i].value)
+	}
+}
+
+func extractCommandLineFlags() (string, Common, File, Database) {
+	var dataSourceType string
+	flag.StringVar(&dataSourceType, "datasource", "file", "Either it is of type file or db")
+	//COMMON
+	var homeLat, homeLng float64
+	var top int
+	flag.Float64Var(&homeLat, "lat", 51.925146, "Latitude of the Home location")
+	flag.Float64Var(&homeLng, "lng", 4.478617, "Longitude of the Home location")
+	flag.IntVar(&top, "top", 5, "Number of top n nearest elements to be calculated")
+	//File properties
+	var filePtr, fileSeparator string
+	flag.StringVar(&filePtr, "file", "", "File absolute path")
+	flag.StringVar(&fileSeparator, "separator", ",", "Separator for the CSV")
+
+	//DB properties
+	var dbptr, dbuser, dbpass, dbname string
+	flag.StringVar(&dbptr, "dbconnectionstring", "127.0.0.1:3306", "DB connection string eg: localhost:3306")
+	flag.StringVar(&dbuser, "user", "root", "user for db")
+	flag.StringVar(&dbpass, "password", "", "password for the user")
+	flag.StringVar(&dbname, "database", "", "Name of the database")
+	flag.Parse()
+
+	common := Common{homeLat, homeLng, top}
+	d := Database{common: common, connectionString: dbptr, username: dbuser, password: dbpass, database: dbname}
+	f := File{filePath: filePtr, delimiter: fileSeparator, common: common}
+	return dataSourceType, common, f, d
+}
+
+func reverseHeap(pq maxHeap) []*Node {
+	//Reverse the list
+	r := make([]*Node, pq.Len())
+	for i := len(r) - 1; i >= 0; i-- {
+		r[i] = heap.Pop(&pq).(*Node)
+	}
+	return r
+}
+
+func calculateDistanceAndEnqueue(recordData Data, homeLocation Point, queue *maxHeap) {
+	calculatedDistance := calculateDistanceInKiloMeters(Point{recordData.lat, recordData.lng}, homeLocation)
+	heap.Push(queue, &Node{recordData, calculatedDistance})
+	if queue.Len() > 5 {
+		heap.Pop(queue)
+	}
 }
 
 func parseLine(record []string) (recordData Data, err error) {
@@ -193,7 +263,7 @@ func (pq maxHeap) Swap(i, j int) {
 }
 
 func (pq *maxHeap) Push(x interface{}) {
-	item := x.(*Item)
+	item := x.(*Node)
 	*pq = append(*pq, item)
 }
 
