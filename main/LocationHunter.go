@@ -34,8 +34,8 @@ const (
 type File struct {
 	filePath  string
 	delimiter string
-
-	common Common
+	strict    bool
+	common    Common
 }
 
 type Database struct {
@@ -59,7 +59,7 @@ type DataSource interface {
 
 func main() {
 
-	dataSourceType, commonProperties, fileProperties, databaseProperties := extractCommandLineFlags()
+	dataSourceType, commonProperties, file, database := extractCommandLineFlags()
 	queue := make(maxHeap, 0, commonProperties.numberOfNearestElements+1)
 	heap.Init(&queue)
 
@@ -67,9 +67,9 @@ func main() {
 
 	switch dataSourceType {
 	case FILE:
-		dataSource = fileProperties
+		dataSource = file
 	case DB:
-		dataSource = databaseProperties
+		dataSource = database
 	default:
 		log.Fatal("Invalid data source type.")
 	}
@@ -79,7 +79,7 @@ func main() {
 	//Convert max to min heap
 	minHeap := reverseHeap(queue)
 	for i := 0; i < len(minHeap); i++ {
-		log.Printf("%.2f:%v \n\n", minHeap[i].distance, minHeap[i].value)
+		log.Printf("Number: %v Distance %.2f Data: %v \n\n", i+1, minHeap[i].distance, minHeap[i].value)
 	}
 }
 
@@ -94,20 +94,22 @@ func extractCommandLineFlags() (string, Common, File, Database) {
 	flag.IntVar(&top, "top", 5, "Number of top n nearest elements to be calculated")
 	//File properties
 	var filePtr, fileSeparator string
+	var strict bool
 	flag.StringVar(&filePtr, "file", "", "File absolute path")
 	flag.StringVar(&fileSeparator, "separator", ",", "Separator for the CSV")
+	flag.BoolVar(&strict, "strict", false, "Should abort on bad line?")
 
 	//DB properties
 	var dbptr, dbuser, dbpass, dbname string
 	flag.StringVar(&dbptr, "dbconnectionstring", "127.0.0.1:3306", "DB connection string eg: localhost:3306")
 	flag.StringVar(&dbuser, "user", "root", "user for db")
-	flag.StringVar(&dbpass, "password", "", "password for the user")
-	flag.StringVar(&dbname, "database", "", "Name of the database")
+	flag.StringVar(&dbpass, "password", "root", "password for the user")
+	flag.StringVar(&dbname, "database", "hoanywhere", "Name of the database")
 	flag.Parse()
 
 	common := Common{homeLat, homeLng, top}
 	d := Database{common: common, connectionString: dbptr, username: dbuser, password: dbpass, database: dbname}
-	f := File{filePath: filePtr, delimiter: fileSeparator, common: common}
+	f := File{filePath: filePtr, delimiter: fileSeparator, strict: strict, common: common}
 	return dataSourceType, common, f, d
 }
 
@@ -127,6 +129,3 @@ func calculateDistanceAndEnqueue(recordData Data, homeLocation Point, queue *max
 		heap.Pop(queue)
 	}
 }
-
-
-

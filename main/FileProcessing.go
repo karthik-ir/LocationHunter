@@ -29,7 +29,13 @@ func (file File) beginProcessing(queue *maxHeap) {
 		}
 
 		if err != nil {
-			log.Fatal("Error Reading the line number : %v %v", lineReadCount, err)
+			if (file.strict) {
+				log.Fatal(fmt.Sprintf("Error Reading the line number : %v %v", lineReadCount, err))
+			} else{
+				log.Println("Bad line found. Ignoring...")
+				lineReadCount = lineReadCount + 1
+				continue
+			}
 		}
 
 		if file.skipLine(lineReadCount) {
@@ -41,7 +47,13 @@ func (file File) beginProcessing(queue *maxHeap) {
 
 		if err != nil {
 			//TODO: May be ignore this line and process later. Clarification required
-			log.Fatal("Invalid text in the file and the processing is stopped.")
+			if file.strict {
+				log.Panic("Invalid text in the file and the processing is stopped.")
+			} else {
+				log.Println("Bad line found. Ignoring...")
+				lineReadCount = lineReadCount + 1
+				continue
+			}
 		}
 
 		calculateDistanceAndEnqueue(recordData, Point{file.common.homeLat, file.common.homeLng}, queue)
