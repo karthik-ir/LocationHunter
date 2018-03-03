@@ -19,7 +19,7 @@ func (db Database) beginProcessing(queue *maxHeap) {
 	if err := connection.Ping(); err != nil {
 		log.Fatal(err)
 	}
-	rows, err := connection.Query("SELECT id,lat,lng FROM geoData")
+	rows, err := connection.Query(fmt.Sprintf("SELECT id,lat,lng FROM %v", db.table))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func (db Database) beginProcessing(queue *maxHeap) {
 		var id int64
 		var lat, lng float64
 
-		if err := rows.Scan(&id,&lat,&lng); err != nil {
+		if err := rows.Scan(&id, &lat, &lng); err != nil {
 			log.Fatal(err)
 		}
 

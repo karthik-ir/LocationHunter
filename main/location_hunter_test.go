@@ -112,7 +112,7 @@ func TestCorrectDataDBStrict(t *testing.T) {
 	commonProperties := Common{51.925146, 4.478617, 5}
 	queue := make(maxHeap, 0, commonProperties.numberOfNearestElements+1)
 	heap.Init(&queue)
-	dataSource := Database{connectionString: "localhost:3306", username: "root", password: "root", database: "hoanywhere", common:commonProperties}
+	dataSource := Database{connectionString: "localhost:3306", username: "root", password: "root", database: "hoanywhere",table: "geoData", common:commonProperties}
 	dataSource.beginProcessing(&queue)
 
 	if (queue.Len() != 5 || queue.Pop().(*Node).value.id != 442406) {

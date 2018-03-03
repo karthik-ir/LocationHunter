@@ -6,8 +6,6 @@ import (
 	"container/heap"
 )
 
-const earthRadius = float64(6371)
-
 type Point struct {
 	lat  float64
 	long float64
@@ -43,8 +41,8 @@ type Database struct {
 	username         string
 	password         string
 	database         string
-
-	common Common
+	table            string
+	common           Common
 }
 
 type Common struct {
@@ -100,15 +98,16 @@ func extractCommandLineFlags() (string, Common, File, Database) {
 	flag.BoolVar(&strict, "strict", false, "Should abort on bad line?")
 
 	//DB properties
-	var dbptr, dbuser, dbpass, dbname string
+	var dbptr, dbuser, dbpass, dbname, tablename string
 	flag.StringVar(&dbptr, "dbconnectionstring", "127.0.0.1:3306", "DB connection string eg: localhost:3306")
 	flag.StringVar(&dbuser, "user", "root", "user for db")
 	flag.StringVar(&dbpass, "password", "root", "password for the user")
 	flag.StringVar(&dbname, "database", "hoanywhere", "Name of the database")
+	flag.StringVar(&tablename, "table", "geoData", "Name of the table")
 	flag.Parse()
 
 	common := Common{homeLat, homeLng, top}
-	d := Database{common: common, connectionString: dbptr, username: dbuser, password: dbpass, database: dbname}
+	d := Database{common: common, connectionString: dbptr, username: dbuser, password: dbpass, database: dbname, table: tablename}
 	f := File{filePath: filePtr, delimiter: fileSeparator, strict: strict, common: common}
 	return dataSourceType, common, f, d
 }
