@@ -32,7 +32,7 @@ func (db Database) beginProcessing(queue *maxHeap) {
 			log.Fatal(err)
 		}
 
-		calculateDistanceAndEnqueue(Data{id: id, lng: lng, lat: lat}, Point{db.common.homeLat, db.common.homeLng}, queue)
+		calculateDistanceAndEnqueue(Data{id: id, lng: lng, lat: lat}, Point{db.common.homeLat, db.common.homeLng}, queue, db.common.numberOfNearestElements)
 	}
 	if err := rows.Err(); err != nil {
 		log.Fatal(err)

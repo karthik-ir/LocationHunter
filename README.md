@@ -24,7 +24,7 @@ Two of sample implementations are as below :
 ##### Commandline arguments 
 
 1. `datasource` - use this to toggle between multiple implementations.
-                  For now its either `file` and `db`
+                  For now its either `file` and `db`. Defaulting to `file`
 
 2. File properties
     

@@ -31,7 +31,7 @@ func (file File) beginProcessing(queue *maxHeap) {
 		if err != nil {
 			if (file.strict) {
 				log.Fatal(fmt.Sprintf("Error Reading the line number : %v %v", lineReadCount, err))
-			} else{
+			} else {
 				log.Println("Bad line found. Ignoring...")
 				lineReadCount = lineReadCount + 1
 				continue
@@ -56,7 +56,7 @@ func (file File) beginProcessing(queue *maxHeap) {
 			}
 		}
 
-		calculateDistanceAndEnqueue(recordData, Point{file.common.homeLat, file.common.homeLng}, queue)
+		calculateDistanceAndEnqueue(recordData, Point{file.common.homeLat, file.common.homeLng}, queue, file.common.numberOfNearestElements)
 		lineReadCount = lineReadCount + 1
 	}
 }

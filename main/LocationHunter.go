@@ -121,10 +121,10 @@ func reverseHeap(pq maxHeap) []*Node {
 	return r
 }
 
-func calculateDistanceAndEnqueue(recordData Data, homeLocation Point, queue *maxHeap) {
+	func calculateDistanceAndEnqueue(recordData Data, homeLocation Point, queue *maxHeap, queueMaxSize int) {
 	calculatedDistance := calculateDistanceInKiloMeters(Point{recordData.lat, recordData.lng}, homeLocation)
 	heap.Push(queue, &Node{recordData, calculatedDistance})
-	if queue.Len() > 5 {
+	if queue.Len() > queueMaxSize {
 		heap.Pop(queue)
 	}
 }
